@@ -23,7 +23,7 @@ import org.apache.rocketmq.client.consumer.AllocateMessageQueueStrategy;
 import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
- * 平均分配可消费的Broker对应的消息队列算法
+ * 按机房hash算法实现算法
  * Computer room Hashing queue algorithm, such as Alipay logic room
  */
 public class AllocateMessageQueueByMachineRoom implements AllocateMessageQueueStrategy {

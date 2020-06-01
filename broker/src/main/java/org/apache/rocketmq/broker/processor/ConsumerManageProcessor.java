@@ -101,6 +101,13 @@ public class ConsumerManageProcessor implements NettyRequestProcessor {
         return response;
     }
 
+    /**
+     * 更新 consumer 端的 offset
+     *  @param ctx
+     * @param request
+     * @return
+     * @throws RemotingCommandException
+     */
     private RemotingCommand updateConsumerOffset(ChannelHandlerContext ctx, RemotingCommand request)
         throws RemotingCommandException {
         final RemotingCommand response =

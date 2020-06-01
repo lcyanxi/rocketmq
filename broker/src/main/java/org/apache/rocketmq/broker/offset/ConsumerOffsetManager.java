@@ -125,6 +125,7 @@ public class ConsumerOffsetManager extends ConfigManager {
         this.commitOffset(clientHost, key, queueId, offset);
     }
 
+
     private void commitOffset(final String clientHost, final String key, final int queueId, final long offset) {
         ConcurrentMap<Integer, Long> map = this.offsetTable.get(key);
         if (null == map) {
@@ -132,6 +133,7 @@ public class ConsumerOffsetManager extends ConfigManager {
             map.put(queueId, offset);
             this.offsetTable.put(key, map);
         } else {
+            // offset放在内存什么时候持久化到磁盘呢？ 肯定有一个定时任务持久化到磁盘
             Long storeOffset = map.put(queueId, offset);
             if (storeOffset != null && offset < storeOffset) {
                 log.warn("[NOTIFYME]update consumer offset less than store. clientHost={}, key={}, queueId={}, requestOffset={}, storeOffset={}", clientHost, key, queueId, offset, storeOffset);

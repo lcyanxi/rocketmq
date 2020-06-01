@@ -64,6 +64,9 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         // todo  为什么是一个空方法
     }
 
+    /**
+     * 更新消费进度
+     */
     @Override
     public void updateOffset(MessageQueue mq, long offset, boolean increaseOnly) {
         if (mq != null) {

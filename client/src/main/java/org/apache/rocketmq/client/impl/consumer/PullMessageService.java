@@ -63,7 +63,7 @@ public class PullMessageService extends ServiceThread {
     public void executePullRequestImmediately(final PullRequest pullRequest) {
         try {
             // 立即放入
-            this.pullRequestQueue.put(pullRequest);
+                this.pullRequestQueue.put(pullRequest);
         } catch (InterruptedException e) {
             log.error("executePullRequestImmediately pullRequestQueue.put", e);
         }

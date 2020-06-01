@@ -72,4 +72,5 @@ public class AllocateMessageQueueAveragely implements AllocateMessageQueueStrate
     public String getName() {
         return "AVG";
     }
+
 }

@@ -823,6 +823,15 @@ public class MQClientAPIImpl {
         throw new MQBrokerException(response.getCode(), response.getRemark());
     }
 
+    /**
+     * 更新broker端consumer 的 offset
+     * @param addr broker地址
+     * @param requestHeader 请求头
+     * @param timeoutMillis 超时时间
+     * @throws RemotingException
+     * @throws MQBrokerException
+     * @throws InterruptedException
+     */
     public void updateConsumerOffset(
         final String addr,
         final UpdateConsumerOffsetRequestHeader requestHeader,
