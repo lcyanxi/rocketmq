@@ -799,6 +799,13 @@ public class MQClientAPIImpl {
         throw new MQBrokerException(response.getCode(), response.getRemark());
     }
 
+    /**
+     *  发送请求，获取broker端存储的消费进度
+     * @param addr broker机器地址
+     * @param requestHeader 请求参数
+     * @param timeoutMillis 超时时间
+     * @return 消费进度
+     */
     public long queryConsumerOffset(
         final String addr,
         final QueryConsumerOffsetRequestHeader requestHeader,
@@ -828,9 +835,6 @@ public class MQClientAPIImpl {
      * @param addr broker地址
      * @param requestHeader 请求头
      * @param timeoutMillis 超时时间
-     * @throws RemotingException
-     * @throws MQBrokerException
-     * @throws InterruptedException
      */
     public void updateConsumerOffset(
         final String addr,

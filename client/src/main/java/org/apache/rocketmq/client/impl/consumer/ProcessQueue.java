@@ -181,6 +181,12 @@ public class ProcessQueue {
         return 0;
     }
 
+    /**
+     * 优点：防止消息丢失（也就是没有消费到）
+     * 缺点：会造成消息重复消费。
+     * @param msgs 消息集合
+     * @return
+     */
     public long removeMessage(final List<MessageExt> msgs) {
         long result = -1;
         final long now = System.currentTimeMillis();
@@ -188,6 +194,7 @@ public class ProcessQueue {
             this.lockTreeMap.writeLock().lockInterruptibly();
             this.lastConsumeTimestamp = now;
             try {
+                // 如果 treeMap 中不存在任何消息，那就返回该处理队列最大的偏移量+1
                 if (!msgTreeMap.isEmpty()) {
                     result = this.queueOffsetMax + 1;
                     int removedCnt = 0;
@@ -199,7 +206,7 @@ public class ProcessQueue {
                         }
                     }
                     msgCount.addAndGet(removedCnt);
-
+                    // 如果移除自己本批消息后，处理队列中，还存在消息，则返回该处理队列中最小的偏移量
                     if (!msgTreeMap.isEmpty()) {
                         result = msgTreeMap.firstKey();
                     }

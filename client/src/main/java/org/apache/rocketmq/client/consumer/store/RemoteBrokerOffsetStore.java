@@ -72,10 +72,12 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         if (mq != null) {
             AtomicLong offsetOld = this.offsetTable.get(mq);
             if (null == offsetOld) {
+                // 如果当前并没有存储该mq的offset,则把传入的offset放入内存中（map)
                 offsetOld = this.offsetTable.putIfAbsent(mq, new AtomicLong(offset));
             }
 
             if (null != offsetOld) {
+                // 更新原先的 offsetOld 的值
                 if (increaseOnly) {
                     MixAll.compareAndIncreaseOnly(offsetOld, offset);
                 } else {
@@ -85,12 +87,18 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         }
     }
 
+    /**
+     * 读取消费队列的消费进度
+     * @param mq 消息队列
+     * @param type 读取来源
+     * @return
+     */
     @Override
     public long readOffset(final MessageQueue mq, final ReadOffsetType type) {
         if (mq != null) {
             switch (type) {
-                case MEMORY_FIRST_THEN_STORE:
-                case READ_FROM_MEMORY: {
+                case MEMORY_FIRST_THEN_STORE:  // 先从内存中读取，如果内存中不存在，再尝试从磁盘中读取
+                case READ_FROM_MEMORY: { // 从内存中读取
                     AtomicLong offset = this.offsetTable.get(mq);
                     if (offset != null) {
                         return offset.get();
@@ -98,8 +106,10 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
                         return -1;
                     }
                 }
+                // 从磁盘中读取
                 case READ_FROM_STORE: {
                     try {
+                        // 从磁盘中读取消费进度，核心入口方法
                         long brokerOffset = this.fetchConsumeOffsetFromBroker(mq);
                         AtomicLong offset = new AtomicLong(brokerOffset);
                         this.updateOffset(mq, offset.get(), false);
@@ -240,8 +250,14 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         }
     }
 
+    /**
+     * 从磁盘中读取消费进度，核心入口方法
+     * @param mq 消息队列
+     * @return long 消息进度
+     */
     private long fetchConsumeOffsetFromBroker(MessageQueue mq) throws RemotingException, MQBrokerException,
         InterruptedException, MQClientException {
+        // 根据 mq 的 broker 名称获取 broker 地址
         FindBrokerResult findBrokerResult = this.mQClientFactory.findBrokerAddressInAdmin(mq.getBrokerName());
         if (null == findBrokerResult) {
 
@@ -250,6 +266,7 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         }
 
         if (findBrokerResult != null) {
+            // 发送请求，获取消费进度
             QueryConsumerOffsetRequestHeader requestHeader = new QueryConsumerOffsetRequestHeader();
             requestHeader.setTopic(mq.getTopic());
             requestHeader.setConsumerGroup(this.groupName);

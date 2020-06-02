@@ -39,15 +39,26 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
  * Local storage implementation
  */
 public class LocalFileOffsetStore implements OffsetStore {
+    /**
+     * offset 存储根目录，默认为用户主目录，例如 /home/lcyanxi
+     */
     public final static String LOCAL_OFFSET_STORE_DIR = System.getProperty(
         "rocketmq.client.localOffsetStoreDir",
         System.getProperty("user.home") + File.separator + ".rocketmq_offsets");
     private final static InternalLogger log = ClientLogger.getLog();
     private final MQClientInstance mQClientFactory;
+    /**
+     * 消费组名称
+     */
     private final String groupName;
+    /**
+     * 具体的消费进度保存文件名（全路径）
+     */
     private final String storePath;
-    private ConcurrentMap<MessageQueue, AtomicLong> offsetTable =
-        new ConcurrentHashMap<MessageQueue, AtomicLong>();
+    /**
+     * 内存中的 offset 进度保持，以 MessageQueue 为键，偏移量为值
+     */
+    private ConcurrentMap<MessageQueue, AtomicLong> offsetTable = new ConcurrentHashMap<MessageQueue, AtomicLong>();
 
     public LocalFileOffsetStore(MQClientInstance mQClientFactory, String groupName) {
         this.mQClientFactory = mQClientFactory;
@@ -58,10 +69,16 @@ public class LocalFileOffsetStore implements OffsetStore {
             "offsets.json";
     }
 
+    /**
+     * 执行load方法加载消费进度
+     * @throws MQClientException
+     */
     @Override
     public void load() throws MQClientException {
+        // 加载本地内存
         OffsetSerializeWrapper offsetSerializeWrapper = this.readLocalOffset();
         if (offsetSerializeWrapper != null && offsetSerializeWrapper.getOffsetTable() != null) {
+            // 将本地的消费进度加载进内存
             offsetTable.putAll(offsetSerializeWrapper.getOffsetTable());
 
             for (MessageQueue mq : offsetSerializeWrapper.getOffsetTable().keySet()) {
@@ -128,6 +145,10 @@ public class LocalFileOffsetStore implements OffsetStore {
         return -1;
     }
 
+    /**
+     * 初次保存offsets.json文件
+     * @param mqs 消息队列
+     */
     @Override
     public void persistAll(Set<MessageQueue> mqs) {
         if (null == mqs || mqs.isEmpty())
@@ -180,6 +201,12 @@ public class LocalFileOffsetStore implements OffsetStore {
         return cloneOffsetTable;
     }
 
+    /**
+     * 加载本地文件的消费进度
+     * 读取 offsets.json 或 offsets.json.bak 中的内容，然后将json转换成map
+     * @return offsetSerializeWrapper
+     * @throws MQClientException
+     */
     private OffsetSerializeWrapper readLocalOffset() throws MQClientException {
         String content = null;
         try {
