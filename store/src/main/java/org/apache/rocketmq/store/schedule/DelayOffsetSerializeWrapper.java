@@ -21,6 +21,9 @@ import java.util.concurrent.ConcurrentMap;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 
 public class DelayOffsetSerializeWrapper extends RemotingSerializable {
+    /**
+     * 延迟级别对应的消费进度，key=延迟级别，value=对应延迟级别下的消费进度
+     */
     private ConcurrentMap<Integer /* level */, Long/* offset */> offsetTable =
         new ConcurrentHashMap<Integer, Long>(32);
 

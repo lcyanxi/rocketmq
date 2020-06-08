@@ -26,6 +26,10 @@ public abstract class ConfigManager {
 
     public abstract String encode();
 
+    /**
+     * 获取配置文件,加载延迟消息的消费进度delayOffset.json
+     * @return
+     */
     public boolean load() {
         String fileName = null;
         try {
