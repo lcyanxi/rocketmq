@@ -66,6 +66,11 @@ public class TopicPublishInfo {
         this.haveTopicRouterInfo = haveTopicRouterInfo;
     }
 
+    /**
+     * 不开启故障延迟机制获取messageQueue
+     * @param lastBrokerName 指的是上一次执行消息发送时选择失败的broker，在重试机制下，第一次执行消息发送时，lastBrokerName=null
+     * @return
+     */
     public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
         if (lastBrokerName == null) {
             return selectOneMessageQueue();
@@ -76,6 +81,7 @@ public class TopicPublishInfo {
                 if (pos < 0)
                     pos = 0;
                 MessageQueue mq = this.messageQueueList.get(pos);
+                // 不取上一次执行消息发送时选择失败的broker
                 if (!mq.getBrokerName().equals(lastBrokerName)) {
                     return mq;
                 }

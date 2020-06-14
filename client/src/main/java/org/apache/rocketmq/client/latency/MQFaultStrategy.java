@@ -24,6 +24,9 @@ import org.apache.rocketmq.common.message.MessageQueue;
 
 public class MQFaultStrategy {
     private final static InternalLogger log = ClientLogger.getLog();
+    /**
+     *  延迟容错对象，维护延迟Brokers的信息 key：brokerName
+     */
     private final LatencyFaultTolerance<String> latencyFaultTolerance = new LatencyFaultToleranceImpl();
 
     /**
@@ -31,7 +34,13 @@ public class MQFaultStrategy {
      */
     private boolean sendLatencyFaultEnable = false;
 
+    /**
+     * 延迟级别数组
+     */
     private long[] latencyMax = {50L, 100L, 550L, 1000L, 2000L, 3000L, 15000L};
+    /**
+     * 不可用时长数组
+     */
     private long[] notAvailableDuration = {0L, 0L, 30000L, 60000L, 120000L, 180000L, 600000L};
 
     public long[] getNotAvailableDuration() {
@@ -65,17 +74,19 @@ public class MQFaultStrategy {
                 // ThreadLocal 保存上一次发送的消息队列下标，消息发送使用轮询机制获取下一个发送消息队列。
                 int index = tpInfo.getSendWhichQueue().getAndIncrement();
                 for (int i = 0; i < tpInfo.getMessageQueueList().size(); i++) {
+                    // 队列位置值取模
                     int pos = Math.abs(index++) % tpInfo.getMessageQueueList().size();
                     if (pos < 0)
                         pos = 0;
                     MessageQueue mq = tpInfo.getMessageQueueList().get(pos);
-                    // 判断当前的消息队列是否可用  只要有一个可用就立刻返回
+                    // 校验队列是否可用
                     if (latencyFaultTolerance.isAvailable(mq.getBrokerName())) {
+                        // mq.getBrokerName().equals(lastBrokerName)是不是搞错了
                         if (null == lastBrokerName || mq.getBrokerName().equals(lastBrokerName))
                             return mq;
                     }
                 }
-                //  此时该topic下的所有队列都不可用  todo  没看懂？？
+                //  尝试从失败的broker列表中选择一个可用的broker  todo  没看懂？？
                 final String notBestBroker = latencyFaultTolerance.pickOneAtLeast();
                 int writeQueueNums = tpInfo.getQueueIdByBroker(notBestBroker);
                 if (writeQueueNums > 0) {
@@ -86,6 +97,7 @@ public class MQFaultStrategy {
                     }
                     return mq;
                 } else {
+                    // 从失败条目中移除已经恢复的broker
                     latencyFaultTolerance.remove(notBestBroker);
                 }
             } catch (Exception e) {

@@ -31,18 +31,23 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
 
     @Override
     public void updateFaultItem(final String name, final long currentLatency, final long notAvailableDuration) {
+        // 从缓存中获取失败条目
         FaultItem old = this.faultItemTable.get(name);
         if (null == old) {
+            // 如果缓存不存在，新建失败条目
             final FaultItem faultItem = new FaultItem(name);
             faultItem.setCurrentLatency(currentLatency);
+            // broker开始可用时间=当前时间+规避时长
             faultItem.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
 
             old = this.faultItemTable.putIfAbsent(name, faultItem);
             if (old != null) {
+                // 更新旧的失败条目
                 old.setCurrentLatency(currentLatency);
                 old.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
             }
         } else {
+            // 更新旧的失败条目
             old.setCurrentLatency(currentLatency);
             old.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
         }
@@ -72,6 +77,7 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         }
 
         if (!tmpList.isEmpty()) {
+            // 随机打乱原来的顺序
             Collections.shuffle(tmpList);
 
             Collections.sort(tmpList);
@@ -96,9 +102,21 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
             '}';
     }
 
+    /**
+     * 存储故障broker的类，称为失败条目
+     */
     class FaultItem implements Comparable<FaultItem> {
+        /**
+         * broker名称
+         */
         private final String name;
+        /**
+         * 消息发送延迟时长
+         */
         private volatile long currentLatency;
+        /**
+         * 故障规避开始时间，判断broker是否可用的时间值
+         */
         private volatile long startTimestamp;
 
         public FaultItem(final String name) {

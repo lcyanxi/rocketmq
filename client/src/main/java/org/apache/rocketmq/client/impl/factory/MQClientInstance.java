@@ -287,7 +287,7 @@ public class MQClientInstance {
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
 
-        // 每隔30s进行broker心跳检测
+        // 每隔30s进行broker心跳检测 &&  清除已经下线的broker
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override

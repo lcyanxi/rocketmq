@@ -43,6 +43,9 @@ import org.apache.rocketmq.store.PutMessageStatus;
 import org.apache.rocketmq.store.SelectMappedBufferResult;
 import org.apache.rocketmq.store.config.StorePathConfigHelper;
 
+/**
+ * 延迟消息处理类
+ */
 public class ScheduleMessageService extends ConfigManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
@@ -133,6 +136,7 @@ public class ScheduleMessageService extends ConfigManager {
             @Override
             public void run() {
                 try {
+                    // 持久化offsetTable(保存了每个延时队列对应的处理进度offset)
                     ScheduleMessageService.this.persist();
                 } catch (Throwable e) {
                     log.error("scheduleAtFixedRate flush exception", e);
@@ -153,6 +157,10 @@ public class ScheduleMessageService extends ConfigManager {
         return this.encode(false);
     }
 
+    /**
+     * load方法在broker启动的时候DefaultMessageStore会调用来初始化延时等级
+     * @return
+     */
     public boolean load() {
         // 加载delayOffset.json文件
         boolean result = super.load();
@@ -273,7 +281,7 @@ public class ScheduleMessageService extends ConfigManager {
             long failScheduleOffset = offset;
 
             if (cq != null) {
-                // 在consumerQueue中根据偏移量找到这条消息的索引信息
+                // 找到offset所处的MappedFile中offset后面的buffer
                 SelectMappedBufferResult bufferCQ = cq.getIndexBuffer(this.offset);
                 if (bufferCQ != null) {
                     try {
@@ -284,7 +292,7 @@ public class ScheduleMessageService extends ConfigManager {
                         for (; i < bufferCQ.getSize(); i += ConsumeQueue.CQ_STORE_UNIT_SIZE) {
                             long offsetPy = bufferCQ.getByteBuffer().getLong();
                             int sizePy = bufferCQ.getByteBuffer().getInt();
-                            //tagsCode-在conumeQueue持久化时候已经变成了DeliverTimestamp
+                            //tagsCode 存储的是消息到期的时间  DeliverTimestamp
                             long tagsCode = bufferCQ.getByteBuffer().getLong();
 
                             if (cq.isExtAddr(tagsCode)) {
@@ -300,9 +308,9 @@ public class ScheduleMessageService extends ConfigManager {
                             }
 
                             long now = System.currentTimeMillis();
-                            // 修正deliverTimestamp,如果deliverTimestamp > now + delayMills说明过期了
+                            // 计算应该投递该消息的时间，如果已经超时则立即投递
                             long deliverTimestamp = this.correctDeliverTimestamp(now, tagsCode);
-
+                            // 计算下一个消息的开始位置，用来寻找下一个消息位置
                             nextOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);
 
                             long countdown = deliverTimestamp - now;
@@ -328,6 +336,10 @@ public class ScheduleMessageService extends ConfigManager {
                                             log.error(
                                                 "ScheduleMessageService, a message time up, but reput it failed, topic: {} msgId {}",
                                                 msgExt.getTopic(), msgExt.getMsgId());
+
+                                            // 投递失败，结束当前task，重新启动TimerTask，从下一个消息开始处理，也就是说当前消息丢弃
+                                            // 更新offsetTable中当前队列的offset为下一个消息的offset
+
                                             ScheduleMessageService.this.timer.schedule(
                                                 new DeliverDelayedMessageTimerTask(this.delayLevel,
                                                     nextOffset), DELAY_FOR_A_PERIOD);
