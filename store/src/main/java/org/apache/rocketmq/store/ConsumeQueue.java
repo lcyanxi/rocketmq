@@ -377,6 +377,7 @@ public class ConsumeQueue {
 
     public void putMessagePositionInfoWrapper(DispatchRequest request) {
         final int maxRetries = 30;
+        // 判断 ConsumeQueue 是否可写
         boolean canWrite = this.defaultMessageStore.getRunningFlags().isCQWriteable();
         for (int i = 0; i < maxRetries && canWrite; i++) {
             long tagsCode = request.getTagsCode();
@@ -394,6 +395,7 @@ public class ConsumeQueue {
                         topic, queueId, request.getCommitLogOffset());
                 }
             }
+            // 写入 consumequeue文件
             boolean result = this.putMessagePositionInfo(request.getCommitLogOffset(),
                 request.getMsgSize(), tagsCode, request.getConsumeQueueOffset());
             if (result) {

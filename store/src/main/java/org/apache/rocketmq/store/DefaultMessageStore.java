@@ -1760,12 +1760,13 @@ public class DefaultMessageStore implements MessageStore {
                     && this.reputFromOffset >= DefaultMessageStore.this.getConfirmOffset()) {
                     break;
                 }
-
+                // 根据偏移量读取偏移量+到 commitlog文件中有效数据的最大偏移量。如果未找到数据，结束doReput 方法。
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
                         this.reputFromOffset = result.getStartOffset();
 
+                        // 循环从 SelectMappedBufferResult 中读取消息，每次读取一条
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
@@ -1773,8 +1774,10 @@ public class DefaultMessageStore implements MessageStore {
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
+                                    // 根据 comitlog 文件内容实时构建 consumequeue、index文件的关键所在
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
+                                    // 如果开启了长轮询并且角色为主节点，则通知有新消息到达，执行一次 pullRequest 验
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
                                         && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()) {
                                         DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),
@@ -1827,6 +1830,7 @@ public class DefaultMessageStore implements MessageStore {
 
             while (!this.isStopped()) {
                 try {
+                    // 每休眠1毫秒执行一次
                     Thread.sleep(1);
                     this.doReput();
                 } catch (Exception e) {

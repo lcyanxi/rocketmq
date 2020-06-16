@@ -78,6 +78,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
     @Override
     public RemotingCommand processRequest(final ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
+        // brokerAllowSuspend：是否允许挂起，也就是是否允许在未找到消息时暂时挂起线程。第一次调用时默认为true
         return this.processRequest(ctx.channel(), request, true);
     }
 
@@ -404,7 +405,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                     }
                     break;
                 case ResponseCode.PULL_NOT_FOUND:
-
+                    // hasSuspendFlag 构建消息拉取时的拉取标记，默认为true
                     if (brokerAllowSuspend && hasSuspendFlag) {
                         long pollingTimeMills = suspendTimeoutMillisLong;
                         if (!this.brokerController.getBrokerConfig().isLongPollingEnable()) {
@@ -414,9 +415,11 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                         String topic = requestHeader.getTopic();
                         long offset = requestHeader.getQueueOffset();
                         int queueId = requestHeader.getQueueId();
+                        // 创建 PullRequest, 然后提交给 PullRequestHoldService 线程去调度，触发消息拉取
                         PullRequest pullRequest = new PullRequest(request, channel, pollingTimeMills,
                             this.brokerController.getMessageStore().now(), offset, subscriptionData, messageFilter);
                         this.brokerController.getPullRequestHoldService().suspendPullRequest(topic, queueId, pullRequest);
+                        // 关键，设置response=null，则此时此次调用不会向客户端输出任何字节，客户端网络请求客户端的读事件不会触发，不会触发对响应结果的处理，处于等待状态
                         response = null;
                         break;
                     }
@@ -536,6 +539,8 @@ public class PullMessageProcessor implements NettyRequestProcessor {
             @Override
             public void run() {
                 try {
+                    // brokerAllowSuspend：false,表示 broker 端不支持挂起，这样在 PullMessageProcessor 方法中，如果没有查找消息，
+                    // 也不会继续再挂起了，因为进入这个方法时，拉取的偏移量是小于队列的最大偏移量，正常情况下是可以拉取到消息的。
                     final RemotingCommand response = PullMessageProcessor.this.processRequest(channel, request, false);
 
                     if (response != null) {

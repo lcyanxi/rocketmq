@@ -99,8 +99,10 @@ public class PullRequestHoldService extends ServiceThread {
             if (2 == kArray.length) {
                 String topic = kArray[0];
                 int queueId = Integer.parseInt(kArray[1]);
+                // 根据主题，消费队列ID查找队列的最大偏移量
                 final long offset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId);
                 try {
+                    // 根据该offset，判断是否有新的消息达到
                     this.notifyMessageArriving(topic, queueId, offset);
                 } catch (Throwable e) {
                     log.error("check hold request failed. topic={}, queueId={}", topic, queueId, e);
@@ -113,11 +115,18 @@ public class PullRequestHoldService extends ServiceThread {
         notifyMessageArriving(topic, queueId, maxOffset, null, 0, null, null);
     }
 
-    public void notifyMessageArriving(final String topic, final int queueId, final long maxOffset, final Long tagsCode,
-        long msgStoreTime, byte[] filterBitMap, Map<String, String> properties) {
+    public void notifyMessageArriving(final String topic,
+                                      final int queueId,
+                                      final long maxOffset, // 消费队列当前最大偏移量
+                                      final Long tagsCode, // 基于tag消息过滤。
+                                      long msgStoreTime, // 消息存储时间
+                                      byte[] filterBitMap,
+                                      Map<String, String> properties // 消息属性,基于属性的消息过滤
+    ) {
         String key = this.buildKey(topic, queueId);
         ManyPullRequest mpr = this.pullRequestTable.get(key);
         if (mpr != null) {
+            // 获取主题与队列的所有 PullRequest 并清除内部 pullRequest 集合，避免重复拉取
             List<PullRequest> requestList = mpr.cloneListAndClear();
             if (requestList != null) {
                 List<PullRequest> replayList = new ArrayList<PullRequest>();
@@ -128,7 +137,9 @@ public class PullRequestHoldService extends ServiceThread {
                         newestOffset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId);
                     }
 
+                    // 如果队列最大偏移量大于 pullFromThisOffset 说明有新的消息到达
                     if (newestOffset > request.getPullFromThisOffset()) {
+                        // 对消息根据 tag,属性进行一次消息过滤
                         boolean match = request.getMessageFilter().isMatchedByConsumeQueue(tagsCode,
                             new ConsumeQueueExt.CqExtUnit(tagsCode, msgStoreTime, filterBitMap));
                         // match by bit map, need eval again when properties is not null.
@@ -146,7 +157,7 @@ public class PullRequestHoldService extends ServiceThread {
                             continue;
                         }
                     }
-
+                    // 如果挂起时间超过 suspendTimeoutMillisLong，则超时，结束长轮询，调用executeRequestWhenWakeup 进行消息拉取，并返回结果到客户端
                     if (System.currentTimeMillis() >= (request.getSuspendTimestamp() + request.getTimeoutMillis())) {
                         try {
                             this.brokerController.getPullMessageProcessor().executeRequestWhenWakeup(request.getClientChannel(),
@@ -160,6 +171,7 @@ public class PullRequestHoldService extends ServiceThread {
                     replayList.add(request);
                 }
 
+                // 待拉取偏移量大于消息消费队列最大偏移量，并且未超时，将拉取任务重新放入，待下一次检测。
                 if (!replayList.isEmpty()) {
                     mpr.addPullRequest(replayList);
                 }
