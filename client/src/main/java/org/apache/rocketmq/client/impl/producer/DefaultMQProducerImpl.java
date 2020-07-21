@@ -1149,6 +1149,14 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
     }
 
+    /**
+     * 发送事务消息
+     * @param msg 消息体
+     * @param tranExecuter transactionListener 事务监听
+     * @param arg 附加参数，该参数会再TransactionListener 回调函数中原值传入。
+     * @return
+     * @throws MQClientException
+     */
     public TransactionSendResult sendMessageInTransaction(final Message msg,
                                                           final TransactionListener tranExecuter, final Object arg)
         throws MQClientException {
@@ -1158,9 +1166,12 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         Validators.checkMessage(msg, this.defaultMQProducer);
 
         SendResult sendResult = null;
+        // 标记消息是half消息
         MessageAccessor.putProperty(msg, MessageConst.PROPERTY_TRANSACTION_PREPARED, "true");
+        // 消息所属发送者组
         MessageAccessor.putProperty(msg, MessageConst.PROPERTY_PRODUCER_GROUP, this.defaultMQProducer.getProducerGroup());
         try {
+            // 发送half消息，该方法是同步发送，事务消息也必须是同步发送
             sendResult = this.send(msg);
         } catch (Exception e) {
             throw new MQClientException("send message Exception", e);
@@ -1170,6 +1181,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         Throwable localException = null;
         switch (sendResult.getSendStatus()) {
             case SEND_OK: {
+                // 只有在half消息发送成功的时候才会执行事务
                 try {
                     if (sendResult.getTransactionId() != null) {
                         msg.putUserProperty("__transactionId__", sendResult.getTransactionId());
@@ -1178,6 +1190,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     if (null != transactionId && !"".equals(transactionId)) {
                         msg.setTransactionId(transactionId);
                     }
+                    // 执行本地事务
                     localTransactionState = tranExecuter.executeLocalTransaction(msg, arg);
                     if (null == localTransactionState) {
                         localTransactionState = LocalTransactionState.UNKNOW;
@@ -1204,6 +1217,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
 
         try {
+            // 根据事务commit的情况来判断下一步操作
             this.endTransaction(sendResult, localTransactionState, localException);
         } catch (Exception e) {
             log.warn("local transaction execute " + localTransactionState + ", but end broker transaction failed", e);
