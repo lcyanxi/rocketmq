@@ -307,7 +307,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 List<MessageExt> msgBackFailed = new ArrayList<MessageExt>(consumeRequest.getMsgs().size());
                 for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
                     MessageExt msg = consumeRequest.getMsgs().get(i);
-                    // 这批所有的消息都会发送消息给Broker,也就是这一批消息都得重新消费。如果发送 ack 失败，则会延迟5s后重新在消费端重新消费。
+                    // 重试发送消息给Broker,如果发送 ack 失败，则会延迟5s后重新在消费端重新消费。
                     boolean result = this.sendMessageBack(msg, context);
                     if (!result) {
                         msg.setReconsumeTimes(msg.getReconsumeTimes() + 1);
@@ -343,6 +343,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
      * @return
      */
     public boolean sendMessageBack(final MessageExt msg, final ConsumeConcurrentlyContext context) {
+        // 默认为0
         int delayLevel = context.getDelayLevelWhenNextConsume();
 
         try {
